@@ -31,63 +31,82 @@ import java.awt.Color;
 public class Label extends Widget {
     Text.Foundry f;
     Text text;
-    String texts;
-    Color col = Color.WHITE;
-	
+    public String texts;
+    public Color col = Color.WHITE;
+
     @RName("lbl")
     public static class $_ implements Factory {
-	public Widget create(UI ui, Object[] args) {
-	    if(args.length > 1)
-		return(new Label((String)args[0], (Integer)args[1]));
-	    else
-		return(new Label((String)args[0]));
-	}
+        public Widget create(UI ui, Object[] args) {
+            if (args.length > 1)
+                return (new Label((String) args[0], (Integer) args[1]));
+            else
+                return (new Label((String) args[0]));
+        }
     }
-	
+
     public void draw(GOut g) {
-	g.image(text.tex(), Coord.z);
+        g.image(text.tex(), Coord.z);
     }
-	
+
     public Label(String text, int w, Text.Foundry f) {
-	super(Coord.z);
-	this.f = f;
-	this.text = f.renderwrap(texts = text, this.col, w);
-	sz = this.text.sz();
+        super(Coord.z);
+        this.f = f;
+        this.text = f.renderwrap(texts = Resource.getLocString(Resource.BUNDLE_LABEL, text), this.col, w);
+        sz = this.text.sz();
     }
 
     public Label(String text, Text.Foundry f) {
-	super(Coord.z);
-	this.f = f;
-	this.text = f.render(texts = text, this.col);
-	sz = this.text.sz();
+        super(Coord.z);
+        this.f = f;
+        this.text = f.render(texts = Resource.getLocString(Resource.BUNDLE_LABEL, text), this.col);
+        sz = this.text.sz();
+    }
+
+    public Label(String text, Text.Foundry f, Color col) {
+        super(Coord.z);
+        this.col = col;
+        this.f = f;
+        this.text = f.render(texts = text, this.col); // used only for numbers and symbols. hence no localization.
+        sz = this.text.sz();
     }
 
     public Label(String text, int w) {
-	this(text, w, Text.std);
+        this(text, w, Text.labelFnd);
     }
-	
+
     public Label(String text) {
-	this(text, Text.std);
+        this(text, Text.labelFnd);
     }
-	
+
     public void settext(String text) {
-	this.text = f.render(texts = text, col);
-	sz = this.text.sz();
+        String t = text;
+        if (!Resource.language.equals("en") || Resource.L10N_DEBUG) {
+            // barrel content
+            final String contStr = "Contents: ";
+            if (text.startsWith(contStr) && !text.endsWith("Empty.")) {
+                String cont = text.substring(contStr.length(), text.length() - 1);
+                t = Resource.getLocString(Resource.BUNDLE_LABEL, contStr) + Resource.getLocContent(cont);
+            } else {
+                t = Resource.getLocString(Resource.BUNDLE_LABEL, text);
+            }
+        }
+        this.text = f.render(texts = t, col);
+        sz = this.text.sz();
     }
-	
+
     public void setcolor(Color color) {
-	col = color;
-	this.text = f.render(texts, col);
-	sz = this.text.sz();
+        col = color;
+        this.text = f.render(texts, col);
+        sz = this.text.sz();
     }
-	
+
     public void uimsg(String msg, Object... args) {
-	if(msg == "set") {
-	    settext((String)args[0]);
-	} else if(msg == "col") {
-	    setcolor((Color)args[0]);
-	} else {
-	    super.uimsg(msg, args);
-	}
+        if (msg == "set") {
+            settext((String) args[0]);
+        } else if (msg == "col") {
+            setcolor((Color) args[0]);
+        } else {
+            super.uimsg(msg, args);
+        }
     }
 }

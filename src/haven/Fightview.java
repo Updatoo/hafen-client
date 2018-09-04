@@ -26,6 +26,7 @@
 
 package haven;
 
+import java.awt.*;
 import java.util.*;
 
 public class Fightview extends Widget {
@@ -43,225 +44,286 @@ public class Fightview extends Widget {
     public double atkcs, atkct;
     public Indir<Resource> lastact = null;
     public double lastuse = 0;
+    public double atkcd;
     private GiveButton curgive;
     private Avaview curava;
     private Button curpurs;
-    public final Bufflist buffs = add(new Bufflist()); {buffs.hide();}
-    
+    public final Bufflist buffs = add(new Bufflist());
+    private static final Gob.Overlay curol = new Gob.Overlay(new FightCurrentOpp());
+    {
+        buffs.hide();
+    }
+    private static final Color combatLogMeClr = new Color(86, 153, 191);
+    private static final Color combatLogOpClr = new Color(234, 105, 105);
+
     public class Relation {
         public final long gobid;
         public final Avaview ava;
-	public final GiveButton give;
-	public final Button purs;
-	public final Bufflist buffs = add(new Bufflist()); {buffs.hide();}
-	public int ip, oip;
-	public Indir<Resource> lastact = null;
-	public double lastuse = 0;
-        
+        public final GiveButton give;
+        public final Button purs;
+        public final Bufflist buffs = add(new Bufflist());
+        {
+            buffs.hide();
+        }
+        public int ip, oip;
+        public Indir<Resource> lastact = null;
+        public double lastuse = 0;
+
         public Relation(long gobid) {
             this.gobid = gobid;
             add(this.ava = new Avaview(avasz, gobid, "avacam")).canactivate = true;
-	    add(this.give = new GiveButton(0, new Coord(15, 15)));
-	    add(this.purs = new Button(70, "Pursue"));
+            add(this.give = new GiveButton(0, new Coord(15, 15)));
+            add(this.purs = new Button(70, "Chase"));
         }
-	
-	public void give(int state) {
-	    if(this == current)
-		curgive.state = state;
-	    this.give.state = state;
-	}
-	
-	public void show(boolean state) {
-	    ava.show(state);
-	    give.show(state);
-	    purs.show(state);
-	}
-	
-	public void remove() {
-	    ui.destroy(ava);
-	    ui.destroy(give);
-	    ui.destroy(purs);
-	}
 
-	public void use(Indir<Resource> act) {
-	    lastact = act;
-	    lastuse = Utils.rtime();
-	}
+        public void give(int state) {
+            if (this == current)
+                curgive.state = state;
+            this.give.state = state;
+        }
+
+        public void show(boolean state) {
+            ava.show(state);
+            give.show(state);
+            purs.show(state);
+        }
+
+        public void remove() {
+            ui.destroy(ava);
+            ui.destroy(give);
+            ui.destroy(purs);
+        }
+
+        public void use(Indir<Resource> act) {
+            lastact = act;
+            lastuse = Utils.rtime();
+            if (lastact != null && Config.logcombatactions) {
+                try {
+                    Resource res = lastact.get();
+                    Resource.Tooltip tt = res.layer(Resource.tooltip);
+                    if (tt == null) {
+                        gameui().syslog.append("Combat: WARNING! tooltip is missing for " + res.name + ". Notify Jorb/Loftar about this.", combatLogOpClr);
+                        return;
+                    }
+                    gameui().syslog.append(String.format("%d: %s, ip %d - %d", gobid, tt.t, ip, oip), combatLogOpClr);
+                } catch (Loading l) {
+                }
+            }
+        }
     }
 
     public void use(Indir<Resource> act) {
-	lastact = act;
-	lastuse = Utils.rtime();
+        lastact = act;
+        lastuse = Utils.rtime();
+        if (lastact != null && Config.logcombatactions) {
+            try {
+                Resource res = lastact.get();
+                Resource.Tooltip tt = res.layer(Resource.tooltip);
+                if (tt == null) {
+                    gameui().syslog.append("Combat: WARNING! tooltip is missing for " + res.name + ". Notify Jorb/Loftar about this.", combatLogMeClr);
+                    return;
+                }
+                String cd = Utils.fmt1DecPlace(atkct - lastuse);
+                gameui().syslog.append(String.format("me: %s, ip %d - %d, cd %ss", tt.t, current.ip, current.oip, cd), combatLogMeClr);
+            } catch (Loading l) {
+            }
+        }
     }
-    
+
     @RName("frv")
     public static class $_ implements Factory {
-	public Widget create(UI ui, Object[] args) {
-	    return(new Fightview());
-	}
+        public Widget create(UI ui, Object[] args) {
+            return (new Fightview());
+        }
     }
-    
+
     public Fightview() {
         super(new Coord(width, (bg.sz().y + ymarg) * height));
     }
 
     public void addchild(Widget child, Object... args) {
-	if(args[0].equals("buff")) {
-	    Widget p;
-	    if(args[1] == null)
-		p = buffs;
-	    else
-		p = getrel((Integer)args[1]).buffs;
-	    p.addchild(child);
-	} else {
-	    super.addchild(child, args);
-	}
+        if (args[0].equals("buff")) {
+            Widget p;
+            if (args[1] == null)
+                p = buffs;
+            else
+                p = getrel((Integer) args[1]).buffs;
+            p.addchild(child);
+        } else {
+            super.addchild(child, args);
+        }
     }
 
     private void setcur(Relation rel) {
-	if((current == null) && (rel != null)) {
-	    add(curgive = new GiveButton(0), cgivec);
-	    add(curava = new Avaview(Avaview.dasz, rel.gobid, "avacam"), cavac).canactivate = true;
-	    add(curpurs = new Button(70, "Pursue"), cpursc);
-	    curgive.state = rel.give.state;
-	} else if((current != null) && (rel == null)) {
-	    ui.destroy(curgive);
-	    ui.destroy(curava);
-	    ui.destroy(curpurs);
-	    curgive = null;
-	    curava = null;
-	    curpurs = null;
-	} else if((current != null) && (rel != null)) {
-	    curgive.state = rel.give.state;
-	    curava.avagob = rel.gobid;
-	}
-	current = rel;
+        if ((current == null) && (rel != null)) {
+            add(curgive = new GiveButton(0), cgivec);
+            add(curava = new Avaview(Avaview.dasz, rel.gobid, "avacam"), cavac).canactivate = true;
+            add(curpurs = new Button(70, "Chase"), cpursc);
+            curgive.state = rel.give.state;
+        } else if ((current != null) && (rel == null)) {
+            ui.destroy(curgive);
+            ui.destroy(curava);
+            ui.destroy(curpurs);
+            curgive = null;
+            curava = null;
+            curpurs = null;
+        } else if ((current != null) && (rel != null)) {
+            curgive.state = rel.give.state;
+            curava.avagob = rel.gobid;
+        }
+        current = rel;
+
+        if (Config.hlightcuropp) {
+            if (current != null) {
+                Gob curgob = ui.sess.glob.oc.getgob(current.gobid);
+                if (curgob != null && !curgob.ols.contains(curol))
+                    curgob.ols.add(curol);
+            }
+            for (Relation r : lsrel) {
+                Gob relgob = ui.sess.glob.oc.getgob(r.gobid);
+                if (relgob != null && r != rel)
+                    relgob.ols.remove(curol);
+            }
+        }
     }
-    
+
     public void destroy() {
-	setcur(null);
-	super.destroy();
+        setcur(null);
+        super.destroy();
     }
-    
+
     public void draw(GOut g) {
         int y = 10;
-	if(curava != null)
-	    y = curava.c.y + curava.sz.y + 10;
-	int x = width - bg.sz().x - 10;
-        for(Relation rel : lsrel) {
-            if(rel == current) {
-		rel.show(false);
+        if (curava != null)
+            y = curava.c.y + curava.sz.y + 10;
+        int x = width - bg.sz().x - 10;
+        for (Relation rel : lsrel) {
+            if (rel == current) {
+                rel.show(false);
                 continue;
-	    }
+            }
             g.image(bg, new Coord(x, y));
             rel.ava.c = new Coord(x + 25, ((bg.sz().y - rel.ava.sz.y) / 2) + y);
-	    rel.give.c = new Coord(x + 5, 4 + y);
-	    rel.purs.c = new Coord(rel.ava.c.x + rel.ava.sz.x + 5, 4 + y);
-	    rel.show(true);
+            rel.give.c = new Coord(x + 5, 4 + y);
+            rel.purs.c = new Coord(rel.ava.c.x + rel.ava.sz.x + 5, 4 + y);
+            rel.show(true);
             y += bg.sz().y + ymarg;
         }
         super.draw(g);
     }
-    
+
     public static class Notfound extends RuntimeException {
         public final long id;
-        
+
         public Notfound(long id) {
             super("No relation for Gob ID " + id + " found");
             this.id = id;
         }
     }
-    
+
     private Relation getrel(long gobid) {
-        for(Relation rel : lsrel) {
-            if(rel.gobid == gobid)
-                return(rel);
+        for (Relation rel : lsrel) {
+            if (rel.gobid == gobid)
+                return (rel);
         }
-        throw(new Notfound(gobid));
+        throw (new Notfound(gobid));
     }
-    
+
     public void wdgmsg(Widget sender, String msg, Object... args) {
-	if(sender == curava) {
-	    wdgmsg("click", (int)current.gobid, args[0]);
-	    return;
-	} else if(sender == curgive) {
-	    wdgmsg("give", (int)current.gobid, args[0]);
-	    return;
-	} else if(sender == curpurs) {
-	    wdgmsg("prs", (int)current.gobid);
-	    return;
-	}
-	for(Relation rel : lsrel) {
-	    if(sender == rel.ava) {
-		wdgmsg("click", (int)rel.gobid, args[0]);
-		return;
-	    } else if(sender == rel.give) {
-		wdgmsg("give", (int)rel.gobid, args[0]);
-		return;
-	    } else if(sender == rel.purs) {
-		wdgmsg("prs", (int)rel.gobid);
-		return;
-	    }
-	}
+        if (sender == curava) {
+            wdgmsg("click", (int) current.gobid, args[0]);
+            return;
+        } else if (sender == curgive) {
+            wdgmsg("give", (int) current.gobid, args[0]);
+            return;
+        } else if (sender == curpurs) {
+            wdgmsg("prs", (int) current.gobid);
+            return;
+        }
+        for (Relation rel : lsrel) {
+            if (sender == rel.ava) {
+                wdgmsg("click", (int) rel.gobid, args[0]);
+                return;
+            } else if (sender == rel.give) {
+                wdgmsg("give", (int) rel.gobid, args[0]);
+                return;
+            } else if (sender == rel.purs) {
+                wdgmsg("prs", (int) rel.gobid);
+                return;
+            }
+        }
         super.wdgmsg(sender, msg, args);
     }
-    
+
     private Indir<Resource> n2r(int num) {
-	if(num < 0)
-	    return(null);
-	return(ui.sess.getres(num));
+        if (num < 0)
+            return (null);
+        return (ui.sess.getres(num));
     }
 
     public void uimsg(String msg, Object... args) {
-        if(msg == "new") {
-            Relation rel = new Relation((Integer)args[0]);
-	    rel.give((Integer)args[1]);
-	    rel.ip = (Integer)args[2];
-	    rel.oip = (Integer)args[3];
+        if (msg == "new") {
+            Relation rel = new Relation((Integer) args[0]);
+            rel.give((Integer) args[1]);
+            rel.ip = (Integer) args[2];
+            rel.oip = (Integer) args[3];
             lsrel.addFirst(rel);
+            ui.sess.glob.oc.isfight = true;
             return;
-        } else if(msg == "del") {
-            Relation rel = getrel((Integer)args[0]);
-	    rel.remove();
+        } else if (msg == "del") {
+            Relation rel = getrel((Integer) args[0]);
+            OCache oc = ui.sess.glob.oc;
+            oc.removedmgoverlay(rel.gobid);
+            if (Config.hlightcuropp) {
+                Gob relgob = ui.sess.glob.oc.getgob(rel.gobid);
+                if (relgob != null)
+                    relgob.ols.remove(curol);
+            }
+            rel.remove();
             lsrel.remove(rel);
-	    if(rel == current)
-		setcur(null);
+            if (lsrel.size() == 0) {
+                oc.removedmgoverlay(MapView.plgob);
+                oc.isfight = false;
+            }
+            if (rel == current)
+                setcur(null);
             return;
-        } else if(msg == "upd") {
+        } else if (msg == "upd") {
+            Relation rel = getrel((Integer) args[0]);
+            rel.give((Integer) args[1]);
+            rel.ip = (Integer) args[2];
+            rel.oip = (Integer) args[3];
+            return;
+        } else if(msg == "used") {
+            use((args[0] == null)?null:ui.sess.getres((Integer)args[0]));
+            return;
+        } else if(msg == "ruse") {
             Relation rel = getrel((Integer)args[0]);
-	    rel.give((Integer)args[1]);
-	    rel.ip = (Integer)args[2];
-	    rel.oip = (Integer)args[3];
+            rel.use((args[1] == null)?null:ui.sess.getres((Integer)args[1]));
             return;
-	} else if(msg == "used") {
-	    use((args[0] == null)?null:ui.sess.getres((Integer)args[0]));
-	    return;
-	} else if(msg == "ruse") {
-	    Relation rel = getrel((Integer)args[0]);
-	    rel.use((args[1] == null)?null:ui.sess.getres((Integer)args[1]));
-	    return;
-        } else if(msg == "cur") {
+        } else if (msg == "cur") {
             try {
-                Relation rel = getrel((Integer)args[0]);
+                Relation rel = getrel((Integer) args[0]);
                 lsrel.remove(rel);
                 lsrel.addFirst(rel);
-		setcur(rel);
-            } catch(Notfound e) {
-		setcur(null);
-	    }
+                setcur(rel);
+            } catch (Notfound e) {
+                setcur(null);
+            }
             return;
-	} else if(msg == "atkc") {
-	    atkcs = Utils.rtime();
-	    atkct = atkcs + (((Number)args[0]).doubleValue() * 0.06);
-	    return;
-	} else if(msg == "blk") {
-	    blk = n2r((Integer)args[0]);
-	    return;
-	} else if(msg == "atk") {
-	    batk = n2r((Integer)args[0]);
-	    iatk = n2r((Integer)args[1]);
-	    return;
-	}
+        } else if (msg == "atkc") {
+            atkcd = ((Number)args[0]).doubleValue();
+            atkcs = Utils.rtime();
+            atkct = atkcs + (atkcd * 0.06);
+            return;
+        } else if (msg == "blk") {
+            blk = n2r((Integer) args[0]);
+            return;
+        } else if (msg == "atk") {
+            batk = n2r((Integer) args[0]);
+            iatk = n2r((Integer) args[1]);
+            return;
+        }
         super.uimsg(msg, args);
     }
 }
