@@ -33,9 +33,9 @@ public class Avatar extends GAttrib {
     private List<Resource.Image> images = null;
 
     public Avatar(Gob gob) {
-        super(gob);
+	super(gob);
     }
-
+	
     void setlayers(List<Indir<Resource>> layers) {
 	synchronized(this) {
 	    this.layers = layers;

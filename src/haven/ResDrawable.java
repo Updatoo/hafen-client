@@ -31,65 +31,61 @@ import java.awt.Color;
 public class ResDrawable extends Drawable {
     public final Indir<Resource> res;
     public Sprite spr = null;
-    public MessageBuf sdt;
+    MessageBuf sdt;
     private int delay = 0;
-
+	
     public ResDrawable(Gob gob, Indir<Resource> res, Message sdt) {
-        super(gob);
-        this.res = res;
-        this.sdt = new MessageBuf(sdt);
-        try {
-            init();
-        } catch (Loading e) {
-        }
+	super(gob);
+	this.res = res;
+	this.sdt = new MessageBuf(sdt);
+	try {
+	    init();
+	} catch(Loading e) {}
     }
-
+	
     public ResDrawable(Gob gob, Resource res) {
-        this(gob, res.indir(), MessageBuf.nil);
+	this(gob, res.indir(), MessageBuf.nil);
     }
-
+	
     public void init() {
-        if (spr != null)
-            return;
-        Resource res = this.res.get();
-        spr = Sprite.create(gob, res, sdt.clone());
-        if (gob.type == null)
-            gob.determineType(res.name);
+	if(spr != null)
+	    return;
+	spr = Sprite.create(gob, res.get(), sdt.clone());
     }
-
+	
     public void setup(RenderList rl) {
-        try {
-            init();
-        } catch (Loading e) {
-            return;
-        }
-        rl.add(spr, null);
+	try {
+	    init();
+	} catch(Loading e) {
+	    return;
+	}
+	rl.add(spr, null);
     }
-
+	
     public void ctick(int dt) {
-        if (spr == null) {
-            delay += dt;
-        } else {
-            spr.tick(delay + dt);
-            delay = 0;
-        }
+	if(spr == null) {
+	    delay += dt;
+	} else {
+	    spr.tick(delay + dt);
+	    delay = 0;
+	}
     }
-
+    
     public void dispose() {
-        if (spr != null)
-            spr.dispose();
+	if(spr != null)
+	    spr.dispose();
     }
-
+    
     public Resource getres() {
-        return (res.get());
+	return(res.get());
     }
-
+    
     public Skeleton.Pose getpose() {
-        init();
-        return (Skeleton.getpose(spr));
+	init();
+	return(Skeleton.getpose(spr));
     }
 
     public Object staticp() {
-        return((spr != null)?spr.staticp():null);
+	return((spr != null)?spr.staticp():null);
     }
 }

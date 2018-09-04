@@ -36,7 +36,7 @@ public class ZMessage extends Message implements Closeable, Flushable {
     private final Message bk;
 
     public ZMessage(Message from) {
-        this.bk = from;
+	this.bk = from;
     }
 
     public boolean underflow(int hint) {
@@ -45,40 +45,40 @@ public class ZMessage extends Message implements Closeable, Flushable {
 		return(false);
 	    zi = new Inflater();
 	}
-        boolean ret = false;
-        if (rbuf.length - rt < 1) {
-            byte[] n = new byte[Math.max(1024, rt - rh) + rt - rh];
-            System.arraycopy(rbuf, rh, n, 0, rt - rh);
-            rt -= rh;
-            rh = 0;
-            rbuf = n;
-        }
-        try {
-            while (true) {
+	boolean ret = false;
+	if(rbuf.length - rt < 1) {
+	    byte[] n = new byte[Math.max(1024, rt - rh) + rt - rh];
+	    System.arraycopy(rbuf, rh, n, 0, rt - rh);
+	    rt -= rh;
+	    rh = 0;
+	    rbuf = n;
+	}
+	try {
+	    while(true) {
 		int rv = zi.inflate(rbuf, rt, rbuf.length - rt);
-                if (rv == 0) {
+		if(rv == 0) {
 		    if(zi.finished()) {
 			zi.end();
 			zi = null;
 			eof = true;
-                        return (ret);
-                    }
+			return(ret);
+		    }
 		    if(zi.needsInput()) {
-                        if (bk.rt - bk.rh < 1) {
-                            if (!bk.underflow(128))
-                                throw (new EOF("Unterminated z-blob"));
-                        }
+			if(bk.rt - bk.rh < 1) {
+			    if(!bk.underflow(128))
+				throw(new EOF("Unterminated z-blob"));
+			}
 			zi.setInput(bk.rbuf, bk.rh, bk.rt - bk.rh);
 			bk.rh = bk.rt;
-                    }
-                } else {
-                    rt += rv;
-                    return (true);
-                }
-            }
-        } catch (DataFormatException e) {
+		    }
+		} else {
+		    rt += rv;
+		    return(true);
+		}
+	    }
+	} catch(DataFormatException e) {
 	    throw(new FormatError("Malformed z-blob", e));
-        }
+	}
     }
 
     private void flush(boolean sync, boolean finish) {

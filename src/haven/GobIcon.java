@@ -26,63 +26,39 @@
 
 package haven;
 
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.util.Map;
-import java.util.WeakHashMap;
+import java.util.*;
+import java.awt.Color;
+import java.awt.image.*;
 
 public class GobIcon extends GAttrib {
     public static final PUtils.Convolution filter = new PUtils.Hanning(1);
     private static final Map<Indir<Resource>, Tex> cache = new WeakHashMap<Indir<Resource>, Tex>();
-    private static final Map<Indir<Resource>, Tex> cachegrey = new WeakHashMap<Indir<Resource>, Tex>();
     public final Indir<Resource> res;
     private Tex tex;
-    private boolean greyscale = false;
 
     public GobIcon(Gob g, Indir<Resource> res) {
-        super(g);
-        this.res = res;
+	super(g);
+	this.res = res;
     }
 
     public Tex tex() {
-        if (this.tex == null) {
-            synchronized (cache) {
-                if (!cache.containsKey(res)) {
-                    Resource.Image img = res.get().layer(Resource.imgc);
-                    Tex tex = img.tex();
-                    if ((tex.sz().x <= 20) && (tex.sz().y <= 20)) {
-                        cache.put(res, tex);
-                    } else {
-                        BufferedImage buf = img.img;
-                        buf = PUtils.rasterimg(PUtils.blurmask2(buf.getRaster(), 1, 1, Color.BLACK));
-                        buf = PUtils.convolvedown(buf, new Coord(20, 20), filter);
-                        cache.put(res, new TexI(buf));
-                    }
-                }
-                this.tex = cache.get(res);
-            }
-        }
-        return (this.tex);
-    }
-
-    public Tex texgrey() {
-        if (!greyscale) {
-            synchronized (cachegrey) {
-                if (!cachegrey.containsKey(res)) {
-                    BufferedImage img = PUtils.monochromize(res.get().layer(Resource.imgc).img, Color.WHITE);
-                    Tex tex = new TexI(img);
-                    if (tex.sz().x <= 20 && tex.sz().y <= 20) {
-                        cachegrey.put(res, tex);
-                    } else {
-                        img = PUtils.rasterimg(PUtils.blurmask2(img.getRaster(), 1, 1, Color.BLACK));
-                        img = PUtils.convolvedown(img, new Coord(20, 20), filter);
-                        cachegrey.put(res, new TexI(img));
-                    }
-                }
-                this.tex = cachegrey.get(res);
-            }
-            greyscale = true;
-        }
-        return this.tex;
+	if(this.tex == null) {
+	    synchronized(cache) {
+		if(!cache.containsKey(res)) {
+		    Resource.Image img = res.get().layer(Resource.imgc);
+		    Tex tex = img.tex();
+		    if((tex.sz().x <= 20) && (tex.sz().y <= 20)) {
+			cache.put(res, tex);
+		    } else {
+			BufferedImage buf = img.img;
+			buf = PUtils.rasterimg(PUtils.blurmask2(buf.getRaster(), 1, 1, Color.BLACK));
+			buf = PUtils.convolvedown(buf, new Coord(20, 20), filter);
+			cache.put(res, new TexI(buf));
+		    }
+		}
+		this.tex = cache.get(res);
+	    }
+	}
+	return(this.tex);
     }
 }

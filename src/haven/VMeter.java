@@ -27,74 +27,56 @@
 package haven;
 
 import java.awt.Color;
-import java.util.HashMap;
-import java.util.Map;
 
 public class VMeter extends Widget {
     static Tex bg = Resource.loadtex("gfx/hud/vm-frame");
     static Tex fg = Resource.loadtex("gfx/hud/vm-tex");
     Color cl;
-    public int amount;
-    private static final Map<String, Integer> levels = new HashMap<String, Integer>(3) {{
-        put("Oven", 3 * 4);   // amount per unit * number of units
-        put("Finery Forge", 6 * 2);
-        put("Ore Smelter", (int) (3.3 * 12));
-    }};
-
+    int amount;
+	
     @RName("vm")
     public static class $_ implements Factory {
-        public Widget create(UI ui, Object[] args) {
-            Color cl;
-            if (args.length > 4) {
-                cl = new Color((Integer) args[1],
-                        (Integer) args[2],
-                        (Integer) args[3],
-                        (Integer) args[4]);
-            } else if (args.length > 3) {
-                cl = new Color((Integer) args[1],
-                        (Integer) args[2],
-                        (Integer) args[3]);
-            } else {
-                cl = (Color) args[1];
-            }
-            return (new VMeter((Integer) args[0], cl));
-        }
+	public Widget create(UI ui, Object[] args) {
+	    Color cl;
+	    if(args.length > 4) {
+		cl = new Color((Integer)args[1],
+			       (Integer)args[2],
+			       (Integer)args[3],
+			       (Integer)args[4]);
+	    } else if(args.length > 3) {
+		cl = new Color((Integer)args[1],
+			       (Integer)args[2],
+			       (Integer)args[3]);
+	    } else {
+		cl = (Color)args[1];
+	    }
+	    return(new VMeter((Integer)args[0], cl));
+	}
     }
-
+	
     public VMeter(int amount, Color cl) {
-        super(bg.sz());
-        this.amount = amount;
-        this.cl = cl;
+	super(bg.sz());
+	this.amount = amount;
+	this.cl = cl;
     }
-
+	
     public void draw(GOut g) {
-        g.image(bg, Coord.z);
-        g.chcolor(cl);
-        int hm = (sz.y - 6);
-        int h = (hm * amount) / 100;
-        g.image(fg, new Coord(0, 0), new Coord(0, sz.y - 3 - h), sz.add(0, h));
-
-        Widget p = this.parent;
-        if (p instanceof Window) {
-            Integer lvl = this.levels.get(((Window) p).origcap);
-            if (lvl != null) {
-                g.chcolor(Color.WHITE);
-                int y = sz.y - 3 - (hm * lvl) / 100;
-                g.line(new Coord(3, y), new Coord(sz.x - 3, y), 1);
-                g.chcolor();
-            }
-        }
+	g.image(bg, Coord.z);
+	g.chcolor(cl);
+	int h = (sz.y - 6);
+	h = (h * amount) / 100;
+	g.image(fg, new Coord(0, 0), new Coord(0, sz.y - 3 - h), sz.add(0, h));
     }
-
+	
     public void uimsg(String msg, Object... args) {
-        if (msg == "set") {
-            amount = (Integer) args[0];
-            if (args.length > 1)
-                cl = (Color) args[1];
-        } else if (msg == "col") {
-            cl = (Color) args[0];
-        } else {
-            super.uimsg(msg, args);
-        }
+	if(msg == "set") {
+	    amount = (Integer)args[0];
+	    if(args.length > 1)
+		cl = (Color)args[1];
+	} else if(msg == "col") {
+	    cl = (Color)args[0];
+	} else {
+	    super.uimsg(msg, args);
+	}
     }
 }

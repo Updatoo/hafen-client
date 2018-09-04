@@ -105,12 +105,12 @@ public class Cons {
     public static Expression smoothstep(Expression a, Expression b, Expression x) {return(Function.Builtin.smoothstep.call(a, b, x));}
 
     public static Expression reduce(Function fun, Expression... es) {
-        if (es.length < 1)
-            throw (new IllegalArgumentException("args < 1"));
-        else if (es.length == 1)
-            return (es[0]);
-        else
-            return (fun.call(es[0], reduce(fun, haven.Utils.splice(es, 1))));
+	if(es.length < 1)
+	    throw(new IllegalArgumentException("args < 1"));
+	else if(es.length == 1)
+	    return(es[0]);
+	else
+	    return(fun.call(es[0], reduce(fun, haven.Utils.splice(es, 1))));
     }
 
     public static Expression min(Expression... es) {return(reduce(Function.Builtin.min, es));}

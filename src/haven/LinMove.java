@@ -31,42 +31,40 @@ public class LinMove extends Moving {
     public Coord2d s, v;
     public double t, lt, e;
     public boolean ts = false;
-    public long lastupd = System.currentTimeMillis();
 
     public LinMove(Gob gob, Coord2d s, Coord2d v) {
-        super(gob);
-        this.s = s;
-        this.v = v;
-        this.t = 0;
-        this.e = Double.NaN;
+	super(gob);
+	this.s = s;
+	this.v = v;
+	this.t = 0;
+	this.e = Double.NaN;
     }
 
     public Coord3f getc() {
-        return(gob.glob.map.getzp(s.add(v.mul(t))));
+	return(gob.glob.map.getzp(s.add(v.mul(t))));
     }
 
     public double getv() {
-        return(v.abs());
+	return(v.abs());
     }
 
     public void ctick(int dt) {
-        if(!ts) {
-            t += (dt / 1000.0) * 0.9;
-            if(!Double.isNaN(e) && (t > e)) {
-                t = e;
-            } else if(t > lt + MAXOVER) {
-                t = lt + MAXOVER;
-                ts = true;
-            }
-        }
+	if(!ts) {
+	    t += (dt / 1000.0) * 0.9;
+	    if(!Double.isNaN(e) && (t > e)) {
+		t = e;
+	    } else if(t > lt + MAXOVER) {
+		t = lt + MAXOVER;
+		ts = true;
+	    }
+	}
     }
 
     public void sett(double t) {
-        lastupd = System.currentTimeMillis();
-        lt = t;
-        if(t > this.t) {
-            this.t = t;
-            ts = false;
-        }
+	lt = t;
+	if(t > this.t) {
+	    this.t = t;
+	    ts = false;
+	}
     }
 }
