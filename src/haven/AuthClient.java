@@ -35,7 +35,7 @@ public class AuthClient {
     private Socket sk;
     private InputStream skin;
     private OutputStream skout;
-    
+
     static {
 	ssl = new SslHelper();
 	try {
@@ -50,7 +50,7 @@ public class AuthClient {
 	skin = sk.getInputStream();
 	skout = sk.getOutputStream();
     }
-    
+
     private static byte[] digest(byte[] pw) {
 	MessageDigest dig;
 	try {
@@ -87,7 +87,7 @@ public class AuthClient {
 	    throw(new RuntimeException("Unexpected reply `" + stat + "' from auth server"));
 	}
     }
-    
+
     public byte[] getcookie() throws IOException {
 	Message rpl = cmd("cookie");
 	String stat = rpl.string();
@@ -107,7 +107,7 @@ public class AuthClient {
 	    throw(new RuntimeException("Unexpected reply `" + stat + "' from auth server"));
 	}
     }
-    
+
     public void close() throws IOException {
 	sk.close();
     }
@@ -121,7 +121,7 @@ public class AuthClient {
 	msg.fin(buf, 2);
 	skout.write(buf);
     }
-    
+
     private void esendmsg(Object... args) throws IOException {
 	MessageBuf buf = new MessageBuf();
 	for(Object arg : args) {
@@ -153,21 +153,21 @@ public class AuthClient {
 	readall(skin, buf);
 	return(new MessageBuf(buf));
     }
-    
+
     public Message cmd(Object... args) throws IOException {
 	esendmsg(args);
 	return(recvmsg());
     }
-    
+
     public static abstract class Credentials {
 	public abstract String tryauth(AuthClient cl) throws IOException;
 	public abstract String name();
 	public void discard() {}
-	
+
 	protected void finalize() {
 	    discard();
 	}
-	
+
 	public static class AuthException extends RuntimeException {
 	    public AuthException(String msg) {
 		super(msg);
@@ -177,14 +177,15 @@ public class AuthClient {
 
     public static class NativeCred extends Credentials {
 	public final String username;
+    public String pass;
 	private byte[] phash;
-	
+
 	public NativeCred(String username, byte[] phash) {
 	    this.username = username;
 	    if((this.phash = phash).length != 32)
 		throw(new IllegalArgumentException("Password hash must be 32 bytes"));
 	}
-	
+
 	private static byte[] ohdearjava(String a) {
 	    try {
 		return(digest(a.getBytes("utf-8")));
@@ -195,12 +196,13 @@ public class AuthClient {
 
 	public NativeCred(String username, String pw) {
 	    this(username, ohdearjava(pw));
+        this.pass = pw;
 	}
-	
+
 	public String name() {
 	    return(username);
 	}
-	
+
 	public String tryauth(AuthClient cl) throws IOException {
 	    Message rpl = cl.cmd("pw", username, phash);
 	    String stat = rpl.string();
@@ -214,7 +216,7 @@ public class AuthClient {
 		throw(new RuntimeException("Unexpected reply `" + stat + "' from auth server"));
 	    }
 	}
-	
+
 	public void discard() {
 	    if(phash != null) {
 		for(int i = 0; i < phash.length; i++)
@@ -227,17 +229,17 @@ public class AuthClient {
     public static class TokenCred extends Credentials implements Serializable {
 	public final String acctname;
 	public final byte[] token;
-	
+
 	public TokenCred(String acctname, byte[] token) {
 	    this.acctname = acctname;
 	    if((this.token = token).length != 32)
 		throw(new IllegalArgumentException("Token must be 32 bytes"));
 	}
-	
+
 	public String name() {
 	    throw(new UnsupportedOperationException());
 	}
-	
+
 	public String tryauth(AuthClient cl) throws IOException {
 	    Message rpl = cl.cmd("token", acctname, token);
 	    String stat = rpl.string();

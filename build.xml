@@ -58,7 +58,7 @@
       <fileset dir="build/classes-lib" />
       <manifest>
 	<attribute name="Main-Class" value="haven.MainFrame" />
-	<attribute name="Class-Path" value="jogl.jar gluegen-rt.jar builtin-res.jar hafen-res.jar" />
+	<attribute name="Class-Path" value="jogl.jar gluegen-rt.jar amber-res.jar builtin-res.jar hafen-res.jar l10n.jar" />
       </manifest>
     </jar>
     <chmod file="build/hafen.jar" perm="a+x" />
@@ -74,14 +74,22 @@
     <available property="lib-builtin-jar" file="lib/builtin-res.jar" />
     <fail unless="lib-builtin-jar" message="builtin-res.jar not available" />
   </target>
+
+<target name="l10n-jar" depends="build-env">
+    <jar destfile="build/l10n.jar">
+      <fileset dir="." includes="l10n/*.properties" excludes="l10n/*_new.properties"/>
+    </jar>
+  </target>
+
   
-  <target name="jars" depends="build-env, jar, res-jar">
+  <target name="jars" depends="build-env, jar, res-jar, l10n-jar">
     <copy todir="build">
       <fileset dir="lib">
 	<include name="jogl.jar" />
 	<include name="gluegen-rt.jar" />
 	<include name="hafen-res.jar" />
 	<include name="builtin-res.jar" />
+	<include name="amber-res.jar" />
       </fileset>
       <fileset dir="lib/jogl-natives" />
     </copy>

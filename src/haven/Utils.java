@@ -26,15 +26,28 @@
 
 package haven;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.awt.RenderingHints;
 import java.io.*;
 import java.nio.*;
 import java.net.URL;
 import java.lang.ref.*;
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.*;
+import java.lang.reflect.InvocationTargetException;
 import java.util.prefs.*;
+import java.util.prefs.Preferences;
 import java.util.*;
 import java.util.function.*;
+import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.image.BufferedImage;
+import java.awt.image.Raster;
+import java.awt.image.WritableRaster;
 import java.awt.Graphics;
 import java.awt.Color;
 import java.awt.image.*;
@@ -65,7 +78,7 @@ public class Utils {
 		}
 	    });
     }
-	
+
     static void drawgay(BufferedImage t, BufferedImage img, Coord c) {
 	Coord sz = imgsz(img);
 	for(int y = 0; y < sz.y; y++) {
@@ -80,25 +93,25 @@ public class Utils {
 	    }
 	}
     }
-	
+
     public static int drawtext(Graphics g, String text, Coord c) {
 	java.awt.FontMetrics m = g.getFontMetrics();
 	g.drawString(text, c.x, c.y + m.getAscent());
 	return(m.getHeight());
     }
-	
+
     static Coord textsz(Graphics g, String text) {
 	java.awt.FontMetrics m = g.getFontMetrics();
 	java.awt.geom.Rectangle2D ts = m.getStringBounds(text, g);
 	return(new Coord((int)ts.getWidth(), (int)ts.getHeight()));
     }
-	
+
     static void aligntext(Graphics g, String text, Coord c, double ax, double ay) {
 	java.awt.FontMetrics m = g.getFontMetrics();
 	java.awt.geom.Rectangle2D ts = m.getStringBounds(text, g);
 	g.drawString(text, (int)(c.x - ts.getWidth() * ax), (int)(c.y + m.getAscent() - ts.getHeight() * ay));
     }
-    
+
     public static String fpformat(int num, int div, int dec) {
 	StringBuilder buf = new StringBuilder();
 	boolean s = false;
@@ -149,7 +162,7 @@ public class Utils {
 	buf.append(dp);
 	return(buf.toString());
     }
-    
+
     public static String odformat2(double num, int md) {
 	if(num < 0)
 	    return("-" + odformat2(-num, md));
@@ -178,10 +191,10 @@ public class Utils {
     static void line(Graphics g, Coord c1, Coord c2) {
 	g.drawLine(c1.x, c1.y, c2.x, c2.y);
     }
-	
+
     static void AA(Graphics g) {
 	java.awt.Graphics2D g2 = (java.awt.Graphics2D)g;
-	g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);		
+	g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
     }
 
     public static Random mkrandoom(long seed) {
@@ -223,14 +236,114 @@ public class Utils {
 	    return(def);
 	}
     }
-	
+
     static void setpref(String prefname, String val) {
 	try {
 	    prefs().put(prefname, val);
 	} catch(SecurityException e) {
 	}
     }
-    
+    static String[] getprefsa(String prefname, String[] def) {
+        try {
+            String jsonstr = Utils.getpref(prefname, null);
+            if (jsonstr == null)
+                return def;
+            JSONArray ja = new JSONArray(jsonstr);
+            String[] ra = new String[ja.length()];
+            for (int i = 0; i < ja.length(); i++)
+                ra[i] = ja.getString(i);
+            return ra;
+        } catch (SecurityException e) {
+            return def;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return def;
+        }
+    }
+
+    static void setprefsa(String prefname, String[] val) {
+        try {
+            String jsonarr = "";
+            for (String s : val)
+                jsonarr += "\"" + s + "\",";
+            if (jsonarr.length() > 0)
+                jsonarr = jsonarr.substring(0, jsonarr.length() - 1);
+            Utils.setpref(prefname, "[" + jsonarr + "]");
+        } catch (SecurityException e) {
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    static void loadprefchklist(String prefname, Map<String, CheckListboxItem> data) {
+        try {
+            String jsonstr = Utils.getpref(prefname, null);
+            if (jsonstr == null)
+                return;
+            JSONArray ja = new JSONArray(jsonstr);
+            for (CheckListboxItem itm : data.values())
+                itm.selected = false;
+            for (int i = 0; i < ja.length(); i++) {
+                CheckListboxItem itm = data.get(ja.getString(i));
+                if (itm != null)
+                    itm.selected = true;
+            }
+        } catch (SecurityException e) {
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    static void setprefchklst(String prefname, Map<String, CheckListboxItem> val) {
+        try {
+            String jsonarr = "";
+            Iterator it = val.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry entry = (Map.Entry)it.next();
+                CheckListboxItem itm = (CheckListboxItem)entry.getValue();
+                if (itm.selected)
+                    jsonarr += "\"" + entry.getKey() + "\",";
+            }
+            if (jsonarr.length() > 0)
+                jsonarr = jsonarr.substring(0, jsonarr.length() - 1);
+            Utils.setpref(prefname, "[" + jsonarr + "]");
+        } catch (SecurityException e) {
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static JSONObject[] getprefjsona(String prefname, JSONObject[] def) {
+        try {
+            String jsonstr = Utils.getpref(prefname, null);
+            if (jsonstr == null)
+                return null;
+            JSONArray ja = new JSONArray(jsonstr);
+            JSONObject[] ra = new JSONObject[ja.length()];
+            for (int i = 0; i < ja.length(); i++)
+                ra[i] = ja.getJSONObject(i);
+            return ra;
+        } catch (SecurityException e) {
+            return def;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return def;
+        }
+    }
+
+    public static void setprefjsona(String prefname, JSONObject[] val) {
+        try {
+            String jsonarr = "";
+            for (JSONObject o : val)
+                jsonarr += o.toString() + ",";
+            if (jsonarr.length() > 0)
+                jsonarr = jsonarr.substring(0, jsonarr.length() - 1);
+            Utils.setpref(prefname, "[" + jsonarr + "]");
+        } catch (SecurityException e) {
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
     static int getprefi(String prefname, int def) {
 	try {
 	    return(prefs().getInt(prefname, def));
@@ -238,7 +351,7 @@ public class Utils {
 	    return(def);
 	}
     }
-    
+
     static void setprefi(String prefname, int val) {
 	try {
 	    prefs().putInt(prefname, val);
@@ -253,7 +366,7 @@ public class Utils {
 	    return(def);
 	}
     }
-    
+
     static void setprefd(String prefname, double val) {
 	try {
 	    prefs().putDouble(prefname, val);
@@ -268,7 +381,7 @@ public class Utils {
 	    return(def);
 	}
     }
-    
+
     static void setprefb(String prefname, boolean val) {
 	try {
 	    prefs().putBoolean(prefname, val);
@@ -289,7 +402,7 @@ public class Utils {
 	    return(def);
 	}
     }
-    
+
     static void setprefc(String prefname, Coord val) {
 	try {
 	    prefs().put(prefname, val.x + "x" + val.y);
@@ -304,14 +417,14 @@ public class Utils {
 	    return(def);
 	}
     }
-	
+
     static void setprefb(String prefname, byte[] val) {
 	try {
 	    prefs().putByteArray(prefname, val);
 	} catch(SecurityException e) {
 	}
     }
-    
+
     public static String getprop(String propname, String def) {
 	try {
 	    String ret;
@@ -348,22 +461,22 @@ public class Utils {
     public static int uint16d(byte[] buf, int off) {
 	return(ub(buf[off]) | (ub(buf[off + 1]) << 8));
     }
-	
+
     public static int int16d(byte[] buf, int off) {
 	return((int)(short)uint16d(buf, off));
     }
-	
+
     public static long uint32d(byte[] buf, int off) {
 	return((long)ub(buf[off]) | ((long)ub(buf[off + 1]) << 8) | ((long)ub(buf[off + 2]) << 16) | ((long)ub(buf[off + 3]) << 24));
     }
-	
+
     public static void uint32e(long num, byte[] buf, int off) {
 	buf[off] = (byte)(num & 0xff);
 	buf[off + 1] = (byte)((num & 0x0000ff00) >> 8);
 	buf[off + 2] = (byte)((num & 0x00ff0000) >> 16);
 	buf[off + 3] = (byte)((num & 0xff000000) >> 24);
     }
-	
+
     public static int int32d(byte[] buf, int off) {
 	return((int)uint32d(buf, off));
     }
@@ -421,7 +534,7 @@ public class Utils {
 	off[0] = i + 1;
 	return(ret);
     }
-    
+
     public static double floatd(byte[] buf, int off) {
 	int e = buf[off];
 	long t = uint32d(buf, off + 1);
@@ -594,7 +707,7 @@ public class Utils {
 	else
 	    return((char)('A' + num - 10));
     }
-	
+
     static int hex2num(char hex) {
 	if((hex >= '0') && (hex <= '9'))
 	    return(hex - '0');
@@ -623,7 +736,7 @@ public class Utils {
 	    ret[o] = (byte)((hex2num(hex.charAt(i)) << 4) | hex2num(hex.charAt(i + 1)));
 	return(ret);
     }
-    
+
     private final static String base64set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     private final static int[] base64rev;
     static {
@@ -678,7 +791,7 @@ public class Utils {
 	}
 	return(buf.toByteArray());
     }
-	
+
     public static String[] splitwords(String text) {
 	ArrayList<String> words = new ArrayList<String>();
 	StringBuilder buf = new StringBuilder();
@@ -733,7 +846,7 @@ public class Utils {
 	    return(null);
 	return(words.toArray(new String[0]));
     }
-	
+
     public static String[] splitlines(String text) {
 	ArrayList<String> ret = new ArrayList<String>();
 	int p = 0;
@@ -756,7 +869,7 @@ public class Utils {
 	    return(0);
 	}
     }
-    
+
     static void readtileof(InputStream in) throws IOException {
         byte[] buf = new byte[4096];
         while(true) {
@@ -764,7 +877,7 @@ public class Utils {
                 return;
         }
     }
-    
+
     public static byte[] readall(InputStream in) throws IOException {
 	byte[] buf = new byte[4096];
 	int off = 0;
@@ -783,7 +896,7 @@ public class Utils {
 	    off += ret;
 	}
     }
-    
+
     private static void dumptg(ThreadGroup tg, PrintWriter out, int indent) {
 	for(int o = 0; o < indent; o++)
 	    out.print("    ");
@@ -910,7 +1023,7 @@ public class Utils {
     public static String titlecase(String str) {
 	return(Character.toTitleCase(str.charAt(0)) + str.substring(1));
     }
-    
+
     public static Color contrast(Color col) {
 	int max = Math.max(col.getRed(), Math.max(col.getGreen(), col.getBlue()));
 	if(max > 128) {
@@ -941,7 +1054,7 @@ public class Utils {
                          ((col & 0x00f0) >>  4) * 17,
                          ((col & 0x000f) >>  0) * 17));
     }
-    
+
     public static BufferedImage outline(BufferedImage img, Color col) {
 	Coord sz = imgsz(img).add(2, 2);
 	BufferedImage ol = TexI.mkbuf(sz);
@@ -967,7 +1080,7 @@ public class Utils {
 	}
 	return(ol);
     }
-    
+
     public static BufferedImage outline2(BufferedImage img, Color col) {
 	BufferedImage ol = outline(img, col);
 	Graphics g = ol.getGraphics();
@@ -982,7 +1095,7 @@ public class Utils {
 	else
 	    return(a / b);
     }
-    
+
     public static int floormod(int a, int b) {
 	int r = a % b;
 	if(r < 0)
@@ -1003,7 +1116,7 @@ public class Utils {
 	double q = a / b;
 	return((q < 0)?(((int)q) - 1):((int)q));
     }
-    
+
     public static float floormod(float a, float b) {
 	float r = a % b;
 	return((a < 0)?(r + b):r);
@@ -1036,7 +1149,7 @@ public class Utils {
 	    return(max);
 	return(d);
     }
-    
+
     public static float clip(float d, float min, float max) {
 	if(d < min)
 	    return(min);
@@ -1044,7 +1157,7 @@ public class Utils {
 	    return(max);
 	return(d);
     }
-    
+
     public static int clip(int i, int min, int max) {
 	if(i < min)
 	    return(min);
@@ -1120,7 +1233,7 @@ public class Utils {
 			 ((x.getBlue()  * f2) + (y.getBlue()  * f1)) / 255,
 			 ((x.getAlpha() * f2) + (y.getAlpha() * f1)) / 255));
     }
-    
+
     public static Color preblend(Color c1, Color c2) {
 	double a1 = c1.getAlpha() / 255.0;
 	double a2 = c2.getAlpha() / 255.0;
@@ -1138,7 +1251,7 @@ public class Utils {
 	oout.writeObject(obj);
 	oout.flush();
     }
-    
+
     public static byte[] serialize(Object obj) {
 	ByteArrayOutputStream out = new ByteArrayOutputStream();
 	try {
@@ -1148,7 +1261,7 @@ public class Utils {
 	}
 	return(out.toByteArray());
     }
-    
+
     public static Object deserialize(InputStream in) throws IOException {
 	ObjectInputStream oin = new ObjectInputStream(in);
 	try {
@@ -1157,7 +1270,7 @@ public class Utils {
 	    return(null);
 	}
     }
-    
+
     public static Object deserialize(byte[] buf) {
 	if(buf == null)
 	    return(null);
@@ -1168,7 +1281,7 @@ public class Utils {
 	    return(null);
 	}
     }
-    
+
     public static boolean parsebool(String s) {
 	if(s == null)
 	    throw(new IllegalArgumentException(s));
@@ -1190,7 +1303,7 @@ public class Utils {
 	    return(def);
 	}
     }
-    
+
     /* Just in case anyone doubted that Java is stupid. :-/ */
     public static FloatBuffer bufcp(float[] a) {
 	FloatBuffer b = mkfbuf(a.length);
@@ -1293,7 +1406,7 @@ public class Utils {
 		((float)c.getAlpha() / 255.0f)
 	    });
     }
-    
+
     @SuppressWarnings("unchecked")
     public static <T> T[] mkarray(Class<T> cl, int len) {
 	return((T[])Array.newInstance(cl, len));
@@ -1355,7 +1468,7 @@ public class Utils {
     public static <T> T[] extend(T[] src, int nl) {
 	return(extend(src, 0, nl));
     }
-    
+
     public static <T, E extends T> T[] extend(T[] src, E ne) {
 	T[] ret = extend(src, 0, src.length + 1);
 	ret[src.length] = ne;
@@ -1373,25 +1486,25 @@ public class Utils {
 	System.arraycopy(src, 0, dst, 0, Math.min(src.length, dst.length));
 	return(dst);
     }
-    
+
     public static double[] extend(double[] src, int nl) {
 	double[] dst = new double[nl];
 	System.arraycopy(src, 0, dst, 0, Math.min(src.length, dst.length));
 	return(dst);
     }
-    
+
     public static float[] extend(float[] src, int nl) {
 	float[] dst = new float[nl];
 	System.arraycopy(src, 0, dst, 0, Math.min(src.length, dst.length));
 	return(dst);
     }
-    
+
     public static short[] extend(short[] src, int nl) {
 	short[] dst = new short[nl];
 	System.arraycopy(src, 0, dst, 0, Math.min(src.length, dst.length));
 	return(dst);
     }
-    
+
     public static <T> T el(Iterable<T> c) {
 	Iterator<T> i = c.iterator();
 	if(!i.hasNext()) return(null);
@@ -1406,7 +1519,7 @@ public class Utils {
 	return(ret);
     }
 
-    public static <T> List<T> reversed(List<T> ls) {
+    public static <T> java.util.List<T> reversed(java.util.List<T> ls) {
 	return(new AbstractList<T>() {
 		public int size() {
 		    return(ls.size());

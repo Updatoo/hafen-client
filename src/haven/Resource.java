@@ -29,12 +29,16 @@ package haven;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.annotation.*;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
 import java.util.*;
 import java.util.function.*;
 import java.net.*;
 import java.io.*;
 import java.security.*;
 import javax.imageio.*;
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 
 public class Resource implements Serializable {
@@ -48,7 +52,20 @@ public class Resource implements Serializable {
     public static Class<AButton> action = AButton.class;
     public static Class<Audio> audio = Audio.class;
     public static Class<Tooltip> tooltip = Tooltip.class;
-    
+
+    public static final String language = Utils.getpref("language", "en");
+    public static final String BUNDLE_TOOLTIP = "tooltip";
+    public static final String BUNDLE_PAGINA = "pagina";
+    public static final String BUNDLE_WINDOW = "window";
+    public static final String BUNDLE_BUTTON = "button";
+    public static final String BUNDLE_FLOWER = "flower";
+    public static final String BUNDLE_MSG = "msg";
+    public static final String BUNDLE_LABEL = "label";
+    public static final String BUNDLE_ACTION = "action";
+    public static final String BUNDLE_INGREDIENT = "ingredient";
+    private final static Map<String, Map<String, String>> l10nBundleMap;
+    public static final boolean L10N_DEBUG = System.getProperty("dumpstr") != null;
+
     private Collection<Layer> layers = new LinkedList<Layer>();
     public final String name;
     public int ver;
@@ -98,7 +115,7 @@ public class Resource implements Serializable {
 	public Resource get(int prio) {
 	    return(pool.load(name, ver, prio).get());
 	}
-	
+
 	public Resource get() {
 	    return(get(0));
 	}
@@ -178,7 +195,7 @@ public class Resource implements Serializable {
 	this.name = name;
 	this.ver = ver;
     }
-	
+
     public static void setcache(ResCache cache) {
 	prscache = cache;
     }
@@ -193,41 +210,41 @@ public class Resource implements Serializable {
     public static interface ResSource {
 	public InputStream get(String name) throws IOException;
     }
-    
+
     public static abstract class TeeSource implements ResSource, Serializable {
 	public ResSource back;
-	
+
 	public TeeSource(ResSource back) {
 	    this.back = back;
 	}
-	
+
 	public InputStream get(String name) throws IOException {
 	    StreamTee tee = new StreamTee(back.get(name));
 	    tee.setncwe();
 	    tee.attach(fork(name));
 	    return(tee);
 	}
-	
+
 	public abstract OutputStream fork(String name) throws IOException;
-	
+
 	public String toString() {
 	    return("forking source backed by " + back);
 	}
     }
-    
+
     public static class CacheSource implements ResSource, Serializable {
 	public final transient ResCache cache;
 	public final String cachedesc;
-	
+
 	public CacheSource(ResCache cache) {
 	    this.cache = cache;
 	    this.cachedesc = String.valueOf(cache);
 	}
-	
+
 	public InputStream get(String name) throws IOException {
 	    return(cache.fetch("res/" + name));
 	}
-	
+
 	public String toString() {
 	    return("cache source backed by " + cachedesc);
 	}
@@ -235,11 +252,11 @@ public class Resource implements Serializable {
 
     public static class FileSource implements ResSource, Serializable {
 	File base;
-	
+
 	public FileSource(File base) {
 	    this.base = base;
 	}
-	
+
 	public InputStream get(String name) throws FileNotFoundException {
 	    File cur = base;
 	    String[] parts = name.split("/");
@@ -248,7 +265,7 @@ public class Resource implements Serializable {
 	    cur = new File(cur, parts[parts.length - 1] + ".res");
 	    return(new FileInputStream(cur));
 	}
-	
+
 	public String toString() {
 	    return("filesystem res source (" + base + ")");
 	}
@@ -277,7 +294,7 @@ public class Resource implements Serializable {
     public static class HttpSource implements ResSource, Serializable {
 	private final transient SslHelper ssl;
 	public URL baseurl;
-	
+
 	{
 	    ssl = new SslHelper();
 	    try {
@@ -289,11 +306,11 @@ public class Resource implements Serializable {
 	    }
 	    ssl.ignoreName();
 	}
-	
+
 	public HttpSource(URL baseurl) {
 	    this.baseurl = baseurl;
 	}
-		
+
 	private URL encodeurl(URL raw) throws IOException {
 	    /* This is "kinda" ugly. It is, actually, how the Java
 	     * documentation recommend that it be done, though... */
@@ -760,7 +777,7 @@ public class Resource implements Serializable {
 	public Resource res;
 	public ResSource src;
 	public LoadException prev;
-	    
+
 	public LoadException(String msg, Resource res) {
 	    super(msg);
 	    this.res = res;
@@ -770,7 +787,7 @@ public class Resource implements Serializable {
 	    super(msg, cause);
 	    this.res = res;
 	}
-	    
+
 	public LoadException(Throwable cause, Resource res) {
 	    super("Load error in resource " + res.toString() + ", from " + res.source, cause);
 	    this.res = res;
@@ -789,14 +806,14 @@ public class Resource implements Serializable {
 	    this(res, String.format(msg, args));
 	}
     }
-    
+
     public static Coord cdec(Message buf) {
 	return(new Coord(buf.int16(), buf.int16()));
     }
-	
+
     public abstract class Layer implements Serializable {
 	public abstract void init();
-	
+
 	public Resource getres() {
 	    return(Resource.this);
 	}
@@ -809,7 +826,7 @@ public class Resource implements Serializable {
     public static class LayerConstructor<T extends Layer> implements LayerFactory<T> {
 	public final Class<T> cl;
 	private final Constructor<T> cons;
-	
+
 	public LayerConstructor(Class<T> cl) {
 	    this.cl = cl;
 	    try {
@@ -818,7 +835,7 @@ public class Resource implements Serializable {
 		throw(new RuntimeException("No proper constructor found for layer type " + cl.getName(), e));
 	    }
 	}
-	
+
 	public T cons(Resource res, Message buf) {
 	    try {
 		return(cons.newInstance(res, buf));
@@ -839,11 +856,11 @@ public class Resource implements Serializable {
     public static void addltype(String name, LayerFactory<?> cons) {
 	ltypes.put(name, cons);
     }
-    
+
     public static <T extends Layer> void addltype(String name, Class<T> cl) {
 	addltype(name, new LayerConstructor<T>(cl));
     }
-    
+
     @dolda.jglob.Discoverable
     @Target(ElementType.TYPE)
     @Retention(RetentionPolicy.RUNTIME)
@@ -852,16 +869,58 @@ public class Resource implements Serializable {
     }
 
     static {
-	for(Class<?> cl : dolda.jglob.Loader.get(LayerName.class).classes()) {
-	    String nm = cl.getAnnotation(LayerName.class).value();
-	    if(LayerFactory.class.isAssignableFrom(cl)) {
-		addltype(nm, Utils.construct(cl.asSubclass(LayerFactory.class)));
-	    } else if(Layer.class.isAssignableFrom(cl)) {
-		addltype(nm, cl.asSubclass(Layer.class));
-	    } else {
-		throw(new Error("Illegal resource layer class: " + cl));
-	    }
-	}
+        l10nBundleMap =  new HashMap<String, Map<String, String>>(9) {{
+            if (!language.equals("en") || Resource.L10N_DEBUG) {
+                put(BUNDLE_TOOLTIP, l10n(BUNDLE_TOOLTIP, language));
+                put(BUNDLE_PAGINA, l10n(BUNDLE_PAGINA, language));
+                put(BUNDLE_WINDOW, l10n(BUNDLE_WINDOW, language));
+                put(BUNDLE_BUTTON, l10n(BUNDLE_BUTTON, language));
+                put(BUNDLE_FLOWER, l10n(BUNDLE_FLOWER, language));
+                put(BUNDLE_MSG, l10n(BUNDLE_MSG, language));
+                put(BUNDLE_LABEL, l10n(BUNDLE_LABEL, language));
+                put(BUNDLE_ACTION, l10n(BUNDLE_ACTION, language));
+                put(BUNDLE_INGREDIENT, l10n(BUNDLE_INGREDIENT, language));
+            }
+        }};
+
+    	for(Class<?> cl : dolda.jglob.Loader.get(LayerName.class).classes()) {
+    	    String nm = cl.getAnnotation(LayerName.class).value();
+    	    if(LayerFactory.class.isAssignableFrom(cl)) {
+    		addltype(nm, Utils.construct(cl.asSubclass(LayerFactory.class)));
+    	    } else if(Layer.class.isAssignableFrom(cl)) {
+    		addltype(nm, cl.asSubclass(Layer.class));
+    	    } else {
+    		throw(new Error("Illegal resource layer class: " + cl));
+    	    }
+    	}
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Map<String, String> l10n(String bundle, String langcode) {
+        Properties props = new Properties();
+
+        InputStream is = Config.class.getClassLoader().getResourceAsStream("l10n/" + bundle + "_" + langcode + ".properties");
+        if (is == null)
+            return null;
+
+        InputStreamReader isr = null;
+        try {
+            isr = new InputStreamReader(is, "UTF-8");
+            props.load(isr);
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (isr != null) {
+                try {
+                    isr.close();
+                } catch (IOException e) { // ignored
+                }
+            }
+        }
+
+        return props.size() > 0 ? new HashMap<>((Map) props) : null;
     }
 
     public interface IDLayer<T> {
@@ -1004,7 +1063,7 @@ public class Resource implements Serializable {
 	    }
 	    return(false);
 	}
-		
+
 	public boolean gayp() {
 	    if(gay == -1)
 		gay = detectgay()?1:0;
@@ -1014,22 +1073,41 @@ public class Resource implements Serializable {
 	public int compareTo(Image other) {
 	    return(z - other.z);
 	}
-	
+
 	public Integer layerid() {
 	    return(id);
 	}
-		
+
 	public void init() {}
     }
 
     @LayerName("tooltip")
     public class Tooltip extends Layer {
 	public final String t;
-                
+
 	public Tooltip(Message buf) {
-	    t = new String(buf.bytes(), Utils.utf8);
+	    //t = new String(buf.bytes(), Utils.utf8);
+        String text = new String(buf.bytes(), Utils.utf8);
+        Resource res = super.getres();
+        String locText = getLocString(BUNDLE_TOOLTIP, res, text);
+
+        if (!language.equals("en")) {
+            if (locText.equals(text) || !res.name.startsWith("gfx/invobjs") ||
+                    // exclude meat "conditions" since the tooltip is dynamically generated and it won't be in right order
+                    text.contains("Raw ") || text.contains("Filet of ") || text.contains("Sizzling") ||
+                    text.contains("Roast") || text.contains("Meat") || text.contains("Spitroast") ||
+                    // exclude food conditions
+                    res.name.startsWith("gfx/invobjs/food/")) {
+                this.t = locText;
+            } else {
+                this.t = locText + " (" + text + ")";
+            }
+            return;
+        }
+
+        this.t = locText;
 	}
-                
+
 	public void init() {}
     }
 
@@ -1037,7 +1115,7 @@ public class Resource implements Serializable {
     public class Neg extends Layer {
 	public Coord cc;
 	public Coord[][] ep;
-		
+
 	public Neg(Message buf) {
 	    cc = cdec(buf);
 	    buf.skip(12);
@@ -1051,7 +1129,7 @@ public class Resource implements Serializable {
 		    ep[epid][o] = cdec(buf);
 	    }
 	}
-		
+
 	public void init() {}
     }
 
@@ -1060,7 +1138,7 @@ public class Resource implements Serializable {
 	private int[] ids;
 	public int id, d;
 	public Image[][] f;
-		
+
 	public Anim(Message buf) {
 	    id = buf.int16();
 	    d = buf.uint16();
@@ -1068,7 +1146,7 @@ public class Resource implements Serializable {
 	    for(int i = 0; i < ids.length; i++)
 		ids[i] = buf.int16();
 	}
-		
+
 	public void init() {
 	    f = new Image[ids.length][];
 	    Image[] typeinfo = new Image[0];
@@ -1086,11 +1164,12 @@ public class Resource implements Serializable {
     @LayerName("pagina")
     public class Pagina extends Layer {
 	public final String text;
-		
+
 	public Pagina(Message buf) {
-	    text = new String(buf.bytes(), Utils.utf8);
+        String text = new String(buf.bytes(), Utils.utf8);
+        this.text = Resource.getLocString(Resource.BUNDLE_PAGINA, super.getres(), text);
 	}
-		
+
 	public void init() {}
     }
 
@@ -1100,7 +1179,8 @@ public class Resource implements Serializable {
 	public final Named parent;
 	public final char hk;
 	public final String[] ad;
-		
+    public final String origName;
+
 	public AButton(Message buf) {
 	    String pr = buf.string();
 	    int pver = buf.uint16();
@@ -1113,17 +1193,18 @@ public class Resource implements Serializable {
 		    throw(new LoadException("Illegal resource dependency", e, Resource.this));
 		}
 	    }
-	    name = buf.string();
+        origName = buf.string();
+	    name = Resource.getLocString(Resource.BUNDLE_ACTION, super.getres(), origName);
 	    buf.string(); /* Prerequisite skill */
 	    hk = (char)buf.uint16();
 	    ad = new String[buf.uint16()];
 	    for(int i = 0; i < ad.length; i++)
 		ad[i] = buf.string();
 	}
-		
+
 	public void init() {}
     }
-    
+
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.TYPE)
     public @interface PublishedCode {
@@ -1163,12 +1244,12 @@ public class Resource implements Serializable {
     public class Code extends Layer {
 	public final String name;
 	transient public final byte[] data;
-		
+
 	public Code(Message buf) {
 	    name = buf.string();
 	    data = buf.bytes();
 	}
-		
+
 	public void init() {}
     }
 
@@ -1176,11 +1257,11 @@ public class Resource implements Serializable {
 	public ResClassLoader(ClassLoader parent) {
 	    super(parent);
 	}
-	
+
 	public Resource getres() {
 	    return(Resource.this);
 	}
-	
+
 	public String toString() {
 	    return("cl:" + Resource.this.toString());
 	}
@@ -1209,12 +1290,12 @@ public class Resource implements Serializable {
 
     public static class LibClassLoader extends ClassLoader {
 	private final ClassLoader[] classpath;
-	
+
 	public LibClassLoader(ClassLoader parent, Collection<ClassLoader> classpath) {
 	    super(parent);
 	    this.classpath = classpath.toArray(new ClassLoader[0]);
 	}
-	
+
 	public Class<?> findClass(String name) throws ClassNotFoundException {
 	    for(ClassLoader lib : classpath) {
 		try {
@@ -1665,6 +1746,263 @@ public class Resource implements Serializable {
 	} finally {
 	    w.close();
 	}
+    }
+
+    private static final String[] fmtLocStringsLabel = new String[]{
+            "Health: %s",
+            "Stamina: %s",
+            "Energy: %s",
+            "Pony Power: %s",
+            "Hunger modifier: %s",
+            "Food event bonus: %s",
+            "Tell %s of your exploits",
+            "Go laugh at %s",
+            "Go rage at %s",
+            "Go wave to %s",
+            "Greet %s",
+            "Visit %s",
+            "Meeting %s",
+            "%s's Biddings",
+            "%s's Labors",
+            "%s's Laundry List",
+            "Believing in %s",
+            "%s's Wild Hunt",
+            "%s's Quest",
+            "By %s's Command",
+            "%s's Quarry",
+            "Hunting for %s",
+            "Grass, Stone, and %s",
+            "%s's Tasks",
+            "%s's Business",
+            "%s Giving the Chase",
+            "A Favor for %s",
+            "%s's Laughter",
+            "Blood for %s",
+            "%s's Follies",
+            "Under %s's Star",
+            "%s's Story",
+            "Errands for %s",
+            "Affair with %s",
+            "%s's Catch",
+            "As %s Wishes",
+            "Poaching for %s",
+            "Crazy Old %s",
+            "Flowers for %s",
+            "Silly %s",
+            "%s's Gathering",
+            "In Name of %s",
+            "%s's Dirty Laundry",
+            "What %s Asked",
+            "Tasked by %s",
+            "What %s Asked",
+            "One for %s",
+            "Fair Game for %s",
+            "Meditations on %s",
+            "%s's Wild Harvest",
+            "%s has invited you to join his party. Do you wish to do so?",
+            "%s has requested to spar with you. Do you accept?",
+            "Experience points gained: %s",
+            "Here lies %s",
+            "Create a level %d artifact"
+    };
+
+    private static final String[] fmtLocStringsFlower = new String[]{
+            "Gild (%s%% chance)"
+    };
+
+    private static final String[] fmtLocStringsMsg = new String[]{
+            "That land is owned by %s.",
+            "The name of this charterstone is \"%s\".",
+            "Will refill in %s days",
+            "Will refill in %s hours",
+            "Will refill in %s minutes",
+            "Will refill in %s seconds",
+            "Will refill in %s second",
+            "Quality: %s",
+            "%s%% grown",
+            "The battering ram cannot be used until the glue has dried, in %s hours."
+    };
+
+    public static String getLocString(String bundle, String key) {
+        Map<String, String> map = l10nBundleMap.get(bundle);
+        if (map == null || key == null)
+            return key;
+        if (Resource.L10N_DEBUG)
+            Resource.saveStrings(bundle, key, key);
+        String ll = map.get(key);
+        // strings which need to be formatted
+        if (ll == null && bundle == BUNDLE_LABEL) {
+            for (String s : fmtLocStringsLabel) {
+                String llfmt = fmtLocString(map, key, s);
+                if (llfmt != null)
+                    return llfmt;
+            }
+        } else if (ll == null && bundle == BUNDLE_FLOWER) {
+            for (String s : fmtLocStringsFlower) {
+                String llfmt = fmtLocString(map, key, s);
+                if (llfmt != null)
+                    return llfmt;
+            }
+        } else if (ll == null && bundle == BUNDLE_MSG) {
+            for (String s : fmtLocStringsMsg) {
+                String llfmt = fmtLocString(map, key, s);
+                if (llfmt != null)
+                    return llfmt;
+            }
+        }
+        return ll != null ? ll : key;
+    }
+
+    private static String fmtLocString(Map<String, String> map, String key, String s) {
+        String ll = map.get(s);
+        if (ll != null) {
+            int vi = s.indexOf("%s");
+
+            String sufix = s.substring(vi + 2);
+            if (sufix.startsWith("%%"))                // fix for strings with escaped percentage sign
+                sufix = sufix.substring(1);
+
+            if (key.startsWith(s.substring(0, vi)) && key.endsWith(sufix))
+                return String.format(ll, key.substring(vi, key.length() - sufix.length()));
+        }
+        return null;
+    }
+
+    public static String getLocString(String bundle, Resource key, String def) {
+        Map<String, String> map = l10nBundleMap.get(bundle);
+        if (map == null || key == null)
+            return def;
+        if (Resource.L10N_DEBUG)
+            Resource.saveStrings(bundle, key.name, def);
+        String ll = map.get(key.name);
+        return ll != null ? ll : def;
+    }
+
+    public static String getLocContent(String str) {
+        String loc;
+        if ((loc = Resource.locContent(str, " l of ")) != null)
+            return loc;
+        if ((loc = Resource.locContent(str, " kg of ")) != null)
+            return loc;
+        if ((loc = Resource.locContent(str, " seeds of ")) != null)
+            return loc;
+        return str;
+    }
+
+    private static String locContent(String str, String type) {
+        int i = str.indexOf(type);
+        if (i > 0) {
+            Map<String, String> map = l10nBundleMap.get(Resource.BUNDLE_LABEL);
+            if (map == null)
+                return str;
+            String contName = str.substring(i);
+            if (Resource.L10N_DEBUG)
+                Resource.saveStrings(Resource.BUNDLE_LABEL, contName, contName);
+            String locContName = map.get(contName);
+            if (locContName != null)
+                return str.substring(0, i) + locContName + " (" + str.substring(i + type.length()) + ")";
+            return str;
+        }
+        return null;
+    }
+
+    private static void saveStrings(String bundle, String key, String val) {
+        synchronized (Resource.class) {
+            if (bundle.equals(BUNDLE_FLOWER)) {
+                if (key.startsWith("Follow ") || key.startsWith("Travel along") ||
+                        key.startsWith("Extend ") && key.startsWith("Connect "))
+                    return;
+            }
+
+            Map<String, String> map = l10nBundleMap.get(bundle);
+
+            if (bundle.equals(BUNDLE_TOOLTIP) &&
+                    (key.startsWith("paginae/act") || key.startsWith("paginae/bld")
+                    || key.startsWith("paginae/craft") || key.startsWith("paginae/gov")
+                    || key.startsWith("paginae/pose") || key.startsWith("paginae/amber")
+                    || key.startsWith("paginae/atk/ashoot") || key.startsWith("paginae/seid")))
+                return;
+
+            if (key == null || key.equals("") || val.equals(""))
+                return;
+
+            if (val.charAt(0) >= '0' && val.charAt(0) <= '9')
+                return;
+
+            if (key.startsWith("Village shield:") ||
+                    key.endsWith("is ONLINE") || key.endsWith("is offline") ||
+                    key.startsWith("Born to ") ||
+                    key.equals("ui/r-enact") /* || key.endsWith("challenged.")*/)
+                return;
+
+            if (bundle == BUNDLE_LABEL) {
+                for (String s : fmtLocStringsLabel) {
+                    if (fmtLocString(map, key, s) != null)
+                        return;
+                }
+            } else if (bundle == BUNDLE_FLOWER) {
+                for (String s : fmtLocStringsFlower) {
+                    if (fmtLocString(map, key, s) != null)
+                        return;
+                }
+            } else if (bundle == BUNDLE_MSG) {
+                for (String s : fmtLocStringsMsg) {
+                    if (fmtLocString(map, key, s) != null)
+                        return;
+                }
+            }
+
+            val = sanitizeVal(val);
+
+            String valOld = map.get(key);
+            if (valOld != null && sanitizeVal(valOld).equals(val))
+                return;
+
+            new File("l10n").mkdirs();
+
+            CharsetEncoder encoder = Charset.forName("UTF-8").newEncoder();
+            encoder.onMalformedInput(CodingErrorAction.REPORT);
+            encoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+            BufferedWriter out = null;
+            try {
+                map.put(key, val);
+                key = key.replace(" ", "\\ ").replace(":", "\\:").replace("=", "\\=").replace("\n", "\\n");
+                if (key.startsWith("\\ "))
+                    key = "\\u0020" + key.substring(2);
+                if (key.endsWith("\\ "))
+                    key = key.substring(0, key.length() - 2) + "\\u0020";
+                out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("l10n/" + bundle + "_new.properties", true), encoder));
+                out.write(key + " = " + val);
+                out.newLine();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            return;
+        }
+    }
+
+    private static String sanitizeVal(String val) {
+        val = val.replace("\\", "\\\\").replace("\n", "\\n").replace("\u0000", "");
+        if (val.startsWith(" "))
+            val = "\\u0020" + val.substring(1);
+        if (val.endsWith(" "))
+            val = val.substring(0, val.length() - 1) + "\\u0020";
+
+        while (val.endsWith("\\n"))
+            val = val.substring(0, val.length() - 2);
+
+        return val;
     }
 
     public static void main(String[] args) throws Exception {

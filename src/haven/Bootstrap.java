@@ -36,41 +36,41 @@ public class Bootstrap implements UI.Receiver, UI.Runner {
     Queue<Message> msgs = new LinkedList<Message>();
     String inituser = null;
     byte[] initcookie = null;
-	
+
     public static class Message {
 	int id;
 	String name;
 	Object[] args;
-		
+
 	public Message(int id, String name, Object... args) {
 	    this.id = id;
 	    this.name = name;
 	    this.args = args;
 	}
     }
-	
+
     public Bootstrap(String hostname, int port) {
 	this.hostname = hostname;
 	this.port = port;
     }
 
-    public Bootstrap() {
-	this(Config.defserv, Config.mainport);
-	if((Config.authuser != null) && (Config.authck != null)) {
-	    setinitcookie(Config.authuser, Config.authck);
-	    Config.authck = null;
-	}
-    }
-    
+    // public Bootstrap() {
+	// this(Config.defserv, Config.mainport);
+	// if((Config.authuser != null) && (Config.authck != null)) {
+	//     setinitcookie(Config.authuser, Config.authck);
+	//     Config.authck = null;
+	// }
+    // }
+
     public void setinitcookie(String username, byte[] cookie) {
 	inituser = username;
 	initcookie = cookie;
     }
-	
+
     private String getpref(String name, String def) {
 	return(Utils.getpref(name + "@" + hostname, def));
     }
-    
+
     private void setpref(String name, String val) {
 	Utils.setpref(name + "@" + hostname, val);
     }
@@ -85,6 +85,7 @@ public class Bootstrap implements UI.Receiver, UI.Runner {
 	    token = Utils.hex2byte(getpref("savedtoken", null));
 	String authserver = (Config.authserv == null)?hostname:Config.authserv;
 	int authport = Config.authport;
+    AuthClient.Credentials creds = null;
 	retry: do {
 	    byte[] cookie;
 	    String acctname, tokenname;
@@ -130,7 +131,8 @@ public class Bootstrap implements UI.Receiver, UI.Runner {
 		    continue retry;
 		}
 	    } else {
-		AuthClient.Credentials creds;
+		//AuthClient.Credentials creds;
+        AuthClient.NativeCred nativecreds;
 		ui.uimsg(1, "passwd", loginname, savepw);
 		while(true) {
 		    Message msg;
@@ -141,6 +143,7 @@ public class Bootstrap implements UI.Receiver, UI.Runner {
 		    if(msg.id == 1) {
 			if(msg.name == "login") {
 			    creds = (AuthClient.Credentials)msg.args[0];
+                nativecreds = (AuthClient.NativeCred) msg.args[0];
 			    savepw = (Boolean)msg.args[1];
 			    loginname = creds.name();
 			    break;
@@ -217,7 +220,17 @@ public class Bootstrap implements UI.Receiver, UI.Runner {
 		}
 	    }
 	} while(true);
-	haven.error.ErrorHandler.setprop("usr", sess.username);
+
+    if (creds != null) {
+        LoginData ld = new LoginData(creds.name(), ((AuthClient.NativeCred)creds).pass);
+        synchronized (Config.logins) {
+            if (!Config.logins.contains(ld)) {
+                Config.logins.add(new LoginData(creds.name(), ((AuthClient.NativeCred)creds).pass));
+                Config.saveLogins();
+            }
+        }
+    }
+	//haven.error.ErrorHandler.setprop("usr", sess.username);
 	return(new RemoteUI(sess));
     }
 

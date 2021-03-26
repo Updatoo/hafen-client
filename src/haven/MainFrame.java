@@ -37,13 +37,14 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
     private final ThreadGroup g;
     private Thread mt;
     DisplayMode fsmode = null, prefs = null;
-	
+    private static final String TITLE = "Haven and Hearth (Porque v"+Config.version + ")";
+
     static {
 	try {
 	    javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
 	} catch(Exception e) {}
     }
-	
+
     DisplayMode findmode(int w, int h) {
 	GraphicsDevice dev = getGraphicsConfiguration().getDevice();
 	if(!dev.isFullScreenSupported())
@@ -58,7 +59,7 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	}
 	return(b);
     }
-	
+
     public void setfs() {
 	GraphicsDevice dev = getGraphicsConfiguration().getDevice();
 	if(prefs != null)
@@ -76,7 +77,7 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	    throw(new RuntimeException(e));
 	}
     }
-	
+
     public void setwnd() {
 	GraphicsDevice dev = getGraphicsConfiguration().getDevice();
 	if(prefs == null)
@@ -203,21 +204,21 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	if((isz == null) && Utils.getprefb("wndmax", false))
 	    setExtendedState(getExtendedState() | MAXIMIZED_BOTH);
     }
-	
+
     private void savewndstate() {
-	if(prefs == null) {
-	    if(getExtendedState() == NORMAL)
-		/* Apparent, getSize attempts to return the "outer
-		 * size" of the window, including WM decorations, even
-		 * though setSize sets the "inner size" of the
-		 * window. Therefore, use the Panel's size instead; it
-		 * ought to correspond to the inner size at all
-		 * times. */{
-		Dimension dim = p.getSize();
-		Utils.setprefc("wndsz", new Coord(dim.width, dim.height));
-	    }
-	    Utils.setprefb("wndmax", (getExtendedState() & MAXIMIZED_BOTH) != 0);
-	}
+    	if(prefs == null) {
+    	    if(getExtendedState() == NORMAL)
+    		/* Apparent, getSize attempts to return the "outer
+    		 * size" of the window, including WM decorations, even
+    		 * though setSize sets the "inner size" of the
+    		 * window. Therefore, use the Panel's size instead; it
+    		 * ought to correspond to the inner size at all
+    		 * times. */{
+    		Dimension dim = p.getSize();
+    		Utils.setprefc("wndsz", new Coord(dim.width, dim.height));
+    	    }
+    	    Utils.setprefb("wndmax", (getExtendedState() & MAXIMIZED_BOTH) != 0);
+    	}
     }
 
     public static Session connect(Object[] args) {
@@ -273,16 +274,22 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 
     private void uiloop() throws InterruptedException {
 	UI.Runner fun = null;
-	while(true) {
-	    if(fun == null)
-		fun = new Bootstrap();
-	    String t = fun.title();
-	    if(t == null)
-		setTitle("Haven and Hearth");
-	    else
-		setTitle("Haven and Hearth \u2013 " + t);
-	    fun = fun.run(p.newui(fun));
-	}
+    	while(true) {
+    	    if(fun == null){
+                Bootstrap bill = new Bootstrap(Config.defserv,Config.mainport);
+                if((Config.authuser != null) && (Config.authck != null)) {
+                    bill.setinitcookie(Config.authuser,Config.authck);
+                    Config.authck = null;
+                }
+                fun = bill;
+            }
+    	    String t = fun.title();
+    	    if(t == null)
+    		    setTitle(TITLE);
+    	    else
+    		    setTitle(TITLE + "\u2013 " + t);
+    	    fun = fun.run(p.newui(fun));
+    	}
     }
 
     private void run(UI.Runner task) {
@@ -295,18 +302,18 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	    Thread ui = new HackThread(p, "Haven UI thread");
 	    ui.start();
 	    try {
-		try {
-		    if(task == null) {
-			uiloop();
-		    } else {
-			while(task != null)
-			    task = task.run(p.newui(task));
-		    }
-		} catch(InterruptedException e) {
-		} finally {
-		    p.newui(null);
-		}
-		savewndstate();
+    		try {
+    		    if(task == null) {
+    			    uiloop();
+    		    } else {
+    			    while(task != null)
+    			        task = task.run(p.newui(task));
+    		    }
+    		} catch(InterruptedException e) {
+    		} finally {
+    		    p.newui(null);
+    		}
+    		savewndstate();
 	    } finally {
 		ui.interrupt();
 		try {
@@ -322,7 +329,7 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	    }
 	}
     }
-    
+
     public static void setupres() {
 	if(ResCache.global != null)
 	    Resource.setcache(ResCache.global);
@@ -347,7 +354,7 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	    }
 	}
     }
-    
+
     static {
 	if((WebBrowser.self = JnlpBrowser.create()) == null)
 	    WebBrowser.self = DesktopBrowser.create();
@@ -458,7 +465,7 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	}
 	System.exit(0);
     }
-    
+
     public static void main(final String[] args) {
 	/* Set up the error handler as early as humanly possible. */
 	ThreadGroup g = new ThreadGroup("Haven main group");
@@ -479,7 +486,7 @@ public class MainFrame extends java.awt.Frame implements Console.Directory {
 	Thread main = new HackThread(g, () -> main2(args), "Haven main thread");
 	main.start();
     }
-	
+
     private static void dumplist(Collection<Resource> list, String fn) {
 	try {
 	    if(fn != null) {

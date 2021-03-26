@@ -28,46 +28,146 @@ package haven;
 
 import java.net.URL;
 import java.io.PrintStream;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.*;
+import java.util.*;
+import java.awt.event.KeyEvent;
+
+import haven.error.ErrorHandler;
+
 import static haven.Utils.getprop;
 
 public class Config {
-    public static String authuser = getprop("haven.authuser", null);
-    public static String authserv = getprop("haven.authserv", null);
-    public static String defserv = getprop("haven.defserv", "127.0.0.1");
+    // public static String authuser = getprop("haven.authuser", null);
+    // public static String authserv = getprop("haven.authserv", null);
+    // public static String defserv = getprop("haven.defserv", "127.0.0.1");
     public static String[] servargs = null;
-    public static URL resurl = geturl("haven.resurl", "");
-    public static URL screenurl = geturl("haven.screenurl", "");
+    // public static URL resurl = geturl("haven.resurl", "");
+    // public static URL screenurl = geturl("haven.screenurl", "");
     public static URL cachebase = geturl("haven.cachebase", "");
     public static URL mapbase = geturl("haven.mapbase", "");
-    public static boolean dbtext = getprop("haven.dbtext", "off").equals("on");
+    // public static boolean dbtext = getprop("haven.dbtext", "off").equals("on");
     public static boolean bounddb = getprop("haven.bounddb", "off").equals("on");
-    public static boolean profile = getprop("haven.profile", "off").equals("on");
-    public static boolean profilegpu = getprop("haven.profilegpu", "off").equals("on");
+    // public static boolean profile = getprop("haven.profile", "off").equals("on");
+    // public static boolean profilegpu = getprop("haven.profilegpu", "off").equals("on");
     public static boolean par = true;
     public static boolean fscache = getprop("haven.fscache", "on").equals("on");
-    public static String resdir = getprop("haven.resdir", System.getenv("HAFEN_RESDIR"));
-    public static boolean nopreload = getprop("haven.nopreload", "no").equals("yes");
+    //public static String resdir = getprop("haven.resdir", System.getenv("HAFEN_RESDIR"));
+    //public static boolean nopreload = getprop("haven.nopreload", "no").equals("yes");
     public static String loadwaited = getprop("haven.loadwaited", null);
     public static String allused = getprop("haven.allused", null);
-    public static int mainport = getint("haven.mainport", 1870);
-    public static int authport = getint("haven.authport", 1871);
+    //public static int mainport = getint("haven.mainport", 1870);
+    //public static int authport = getint("haven.authport", 1871);
     public static boolean softres = getprop("haven.softres", "on").equals("on");
     public static Double uiscale = getfloat("haven.uiscale", null);
     public static byte[] authck = null;
     public static String prefspec = "hafen";
-    public static final String confid = "";
-    
+
+    public static String authuser = null;
+    public static String authserv = null;
+    public static String defserv = null;
+    public static URL resurl = null;
+    public static boolean dbtext = false;
+    public static boolean profile = false;
+    public static boolean profilegpu = false;
+    public static String resdir = getprop("haven.resdir", System.getenv("HAFEN_RESDIR"));
+    public static boolean nopreload = false;
+    public static int mainport = 1870;
+    public static int authport = 1871;
+    public static URL screenurl = geturl("http://game.havenandhearth.com/mt/ss");
+
+
+    public static final String confid = "porque";
+
+    //Fonts
+    public static boolean fontaa = Utils.getprefb("fontaa", false);
+    public static boolean usefont = Utils.getprefb("usefont", false);
+    public static String font = Utils.getpref("font", "SansSerif");
+    public static int fontadd = Utils.getprefi("fontadd", 0);
+    public static int fontsizechat = Utils.getprefi("fontsizechat", 14);
+
+
+    public static List<LoginData> logins = new ArrayList<LoginData>();
+    public static String version;
+    public static String gitrev;
+
+public static final boolean iswindows = System.getProperty("os.name").startsWith("Windows");
     static {
-	String p;
-	if((p = getprop("haven.authck", null)) != null)
-	    authck = Utils.hex2byte(p);
+    	String p;
+    	if((p = getprop("haven.authck", null)) != null)
+    	    authck = Utils.hex2byte(p);
+
+        try {
+            InputStream in = ErrorHandler.class.getResourceAsStream("/buildinfo");
+            try {
+                if (in != null) {
+                    java.util.Scanner s = new java.util.Scanner(in);
+                    String[] binfo = s.next().split(",");
+                    version = binfo[0];
+                    gitrev = binfo[1];
+                }
+            } finally {
+                in.close();
+            }
+        } catch (Exception e) {}
+            System.out.println("hewwo");
+        loadLogins();
     }
-    
+
+    private static void loadLogins() {
+        try {
+            String loginsjson = Utils.getpref("logins", null);
+            if (loginsjson == null){
+                System.out.println("got here");
+                return;
+            }
+
+            JSONArray larr = new JSONArray(loginsjson);
+            for (int i = 0; i < larr.length(); i++) {
+                JSONObject l = larr.getJSONObject(i);
+                logins.add(new LoginData(l.get("name").toString(), l.get("pass").toString()));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void saveLogins() {
+        try {
+            List<String> larr = new ArrayList<String>();
+            for (LoginData ld : logins) {
+                String ldjson = new JSONObject(ld, new String[] {"name", "pass"}).toString();
+                larr.add(ldjson);
+            }
+            String jsonobjs = "";
+            for (String s : larr)
+                jsonobjs += s + ",";
+            if (jsonobjs.length() > 0)
+                jsonobjs = jsonobjs.substring(0, jsonobjs.length()-1);
+            Utils.setpref("logins", "[" + jsonobjs + "]");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private static int getint(String name, int def) {
 	String val = getprop(name, null);
 	if(val == null)
 	    return(def);
 	return(Integer.parseInt(val));
+    }
+
+    private static URL geturl(String url) {
+        if (url.equals(""))
+            return null;
+        try {
+            return new URL(url);
+        } catch(java.net.MalformedURLException e) {
+            throw(new RuntimeException(e));
+        }
     }
 
     private static URL geturl(String name, String def) {
